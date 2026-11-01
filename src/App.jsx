@@ -7,7 +7,7 @@ const date=d=>new Intl.DateTimeFormat("es-CL",{day:"2-digit",month:"short",year:
 const time=s=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60),v=s%60;return h?`${h}:${String(m).padStart(2,"0")}:${String(v).padStart(2,"0")}`:`${m}:${String(v).padStart(2,"0")}`};
 const pace=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 const initials=n=>n?.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase()||"?";
-function Avatar({u,size=""}){return u?.avatar_path?<img className={`avatar ${size}`} src={supabase.storage.from("7k-media").getPublicUrl(u.avatar_path).data.publicUrl}/>:<div className={`avatar fallback ${size}`}>{initials(u?.display_name)}</div>}
+function Avatar({u,size=""}){return u?.avatar_path?<img className={`avatar ${size}`} src={u.avatar_url||supabase.storage.from("7k-media").getPublicUrl(u.avatar_path).data.publicUrl}/>:<div className={`avatar fallback ${size}`}>{initials(u?.display_name)}</div>}
 function Modal({title,close,children}){return <div className="shade" onMouseDown={e=>e.target===e.currentTarget&&close()}><section className="modal"><header><div><small>THE 7K PROJECT</small><h2>{title}</h2></div><button className="icon" onClick={close}><X/></button></header>{children}</section></div>}
 function UploadBox({title,file,setFile}){return <label className="upload"><ImagePlus/><b>{file?file.name:title}</b><small>{file?`${formatBytes(file.size)} · WebP al subir`:"Seleccionar imagen"}</small><input hidden type="file" accept="image/*" onChange={e=>setFile(e.target.files?.[0]||null)}/></label>}
 export default function App(){
@@ -15,9 +15,10 @@ export default function App(){
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[tab,setTab]=useState("home"),[showRun,setShowRun]=useState(false),[showGoal,setShowGoal]=useState(false),[toast,setToast]=useState("");
  const [credentials,setCredentials]=useState({username:"mathias",password:""}),[run,setRun]=useState({distance:"3",duration:"20:00",difficulty:6,notes:"",date:new Date().toISOString().slice(0,16)}),[proof,setProof]=useState(null),[photo,setPhoto]=useState(null),[filter,setFilter]=useState("all");
  const [goal,setGoal]=useState({target_distance_km:7,deadline:"",banner_message:""});
- const refresh=useCallback(async(t=token)=>{if(!t)return;const d=await api("dashboard",{token:t});setData(d);setGoal({target_distance_km:d.settings?.target_distance_km||7,deadline:d.settings?.deadline||"",banner_message:d.settings?.banner_message||""})},[token]);
+ const refresh=useCallback(async(t=token)=>{if(!t)return;const d=await api("dashboard",{token:t});d.users=(d.users||[]).map(u=>({...u,avatar_url:d.media?.[u.avatar_path]||null}));setData(d);setGoal({target_distance_km:d.settings?.target_distance_km||7,deadline:d.settings?.deadline||"",banner_message:d.settings?.banner_message||""})},[token]);
  useEffect(()=>{if(!token)return;let ok=true;(async()=>{try{const m=await api("me",{token});if(!ok)return;setUser(m.user);await refresh(token)}catch(e){sessionStorage.removeItem("7k_session");setToken("");setUser(null);setError(e.message)}})();return()=>{ok=false}},[token,refresh]);
  useEffect(()=>{if(!token||!user)return;const id=setInterval(()=>refresh().catch(()=>{}),20000);return()=>clearInterval(id)},[token,user,refresh]);
+ useEffect(()=>{if(!token||!user)return;const channel=supabase.channel("7k-team").on("broadcast",{event:"refresh"},()=>refresh().catch(()=>{})).subscribe();return()=>{supabase.removeChannel(channel)}},[token,user,refresh]);
  useEffect(()=>{if(!toast)return;const id=setTimeout(()=>setToast(""),3000);return()=>clearTimeout(id)},[toast]);
  const users=data.users||[],runs=data.runs||[],admin=user?.role==="admin",target=Number(data.settings?.target_distance_km||7);
  const stats=useMemo(()=>users.map(u=>{const own=runs.filter(r=>r.user_id===u.id),total=own.reduce((a,r)=>a+Number(r.distance_km),0),best=own.reduce((a,r)=>!a||Number(r.distance_km)>Number(a.distance_km)?r:a,null);return {...u,total,count:own.length,best,latest:own[0]}}),[users,runs]);
