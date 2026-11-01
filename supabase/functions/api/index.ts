@@ -81,7 +81,7 @@ Deno.serve(async req => {
         db.from("activity_events").select("id,user_id,event_type,run_id,message,created_at").order("created_at",{ascending:false}).limit(20)
       ]);
       if(e1||e2||e3||e4) throw e1??e2??e3??e4;
-      const paths=[...(users??[]).map((u:any)=>u.avatar_path),...(runs??[]).flatMap((r:any)=>[r.strava_image_path,r.extra_image_path])].filter(Boolean);
+      const paths=[...(users??[]).map((u:any)=>u.avatar_path)].filter(Boolean);
       const media:Record<string,string>={};
       await Promise.all([...new Set(paths)].map(async(path:string)=>{const {data:signed}=await db.storage.from("7k-media").createSignedUrl(path,3600);if(signed?.signedUrl)media[path]=signed.signedUrl;}));
       return json({users,runs,settings,events,media});
