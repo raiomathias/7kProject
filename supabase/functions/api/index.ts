@@ -57,9 +57,18 @@ Deno.serve(async req => {
     if(path==="login" && method==="POST") {
       const username=String(body.username??"").trim().toLowerCase(), password=String(body.password??"");
       if(!username||!password||password.length>256) return json({error:"Usuario o contraseña incorrectos."},401);
+      const ip=req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+      const ipHash=await sha(ip), cutoff=new Date(Date.now()-15*60*1000).toISOString();
+      const {count:attempts}=await db.from("login_attempts").select("id",{count:"exact",head:true}).eq("username",username).eq("ip_hash",ipHash).gt("attempted_at",cutoff);
+      if((attempts??0)>=8) return json({error:"Demasiados intentos. Espera 15 minutos antes de volver a intentar."},429);
+      await db.from("login_attempts").delete().lt("attempted_at",new Date(Date.now()-24*60*60*1000).toISOString());
       const {data:u}=await db.from("users").select("*").eq("username",username).eq("is_active",true).maybeSingle();
       const calculated=u?await passwordHash(password,u.password_salt):await passwordHash(password,"00112233445566778899aabbccddeeff");
-      if(!u || !same(calculated,u.password_hash)) return json({error:"Usuario o contraseña incorrectos."},401);
+      if(!u || !same(calculated,u.password_hash)) {
+        await db.from("login_attempts").insert({username,ip_hash:ipHash});
+        return json({error:"Usuario o contraseña incorrectos."},401);
+      }
+      await db.from("login_attempts").delete().eq("username",username).eq("ip_hash",ipHash);
       const token=random(32), tokenHash=await sha(token);
       const {error}=await db.from("sessions").insert({user_id:u.id,token_hash:tokenHash,expires_at:new Date(Date.now()+30*86400000).toISOString(),user_agent:req.headers.get("user-agent")?.slice(0,300)});
       if(error) throw error;
