@@ -322,10 +322,15 @@ Deno.serve(async req => {
         db.from("activity_events").select("id,user_id,event_type,run_id,message,created_at").order("created_at",{ascending:false}).limit(20)
       ]);
       if(e1||e2||e3||e4) throw e1??e2??e3??e4;
+      const runIds=(runs??[]).filter((r:any)=>r.source==="strava"&&r.strava_activity_id).map((r:any)=>Number(r.strava_activity_id));
+      const {data:details,error:detailError}=runIds.length?await db.from("strava_activity_details").select("strava_activity_id,streams,splits_metric,laps,activity_type,timezone,start_date_local,moving_time,elapsed_time,raw_summary").in("strava_activity_id",runIds):{data:[],error:null};
+      if(detailError) throw detailError;
+      const detailMap=new Map((details??[]).map((d:any)=>[Number(d.strava_activity_id),d]));
+      const enrichedRuns=(runs??[]).map((r:any)=>({...r,detail:r.strava_activity_id?detailMap.get(Number(r.strava_activity_id))??null:null}));
       const paths=[...(users??[]).map((u:any)=>u.avatar_path),...(runs??[]).slice(0,12).flatMap((r:any)=>[r.strava_image_path,r.extra_image_path])].filter(Boolean);
       const media:Record<string,string>={};
       await Promise.all([...new Set(paths)].map(async(path:string)=>{const {data:signed}=await db.storage.from("7k-media").createSignedUrl(path,3600);if(signed?.signedUrl)media[path]=signed.signedUrl;}));
-      return json({users,runs,settings,events,media});
+      return json({users,runs:enrichedRuns,settings,events,media});
     }
     if(path==="runs" && method==="POST") {
       const distance=Number(body.distance_km), duration=Number(body.duration_seconds), difficulty=Number(body.difficulty);
