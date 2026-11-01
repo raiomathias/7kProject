@@ -7,7 +7,7 @@ const date=d=>new Intl.DateTimeFormat("es-CL",{day:"2-digit",month:"short",year:
 const time=s=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60),v=s%60;return h?`${h}:${String(m).padStart(2,"0")}:${String(v).padStart(2,"0")}`:`${m}:${String(v).padStart(2,"0")}`};
 const pace=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 const initials=n=>n?.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase()||"?";
-function Avatar({u,size=""}){return u?.avatar_path?<img className={`avatar ${size}`} src={u.avatar_url||supabase.storage.from("7k-media").getPublicUrl(u.avatar_path).data.publicUrl}/>:<div className={`avatar fallback ${size}`}>{initials(u?.display_name)}</div>}
+function Avatar({u,size=""}){return u?.avatar_url?<img className={`avatar ${size}`} src={u.avatar_url} alt={u.display_name}/>:<div className={`avatar fallback ${size}`}>{initials(u?.display_name)}</div>}
 function Modal({title,close,children}){return <div className="shade" onMouseDown={e=>e.target===e.currentTarget&&close()}><section className="modal"><header><div><small>THE 7K PROJECT</small><h2>{title}</h2></div><button className="icon" onClick={close}><X/></button></header>{children}</section></div>}
 function UploadBox({title,file,setFile}){return <label className="upload"><ImagePlus/><b>{file?file.name:title}</b><small>{file?`${formatBytes(file.size)} · WebP al subir`:"Seleccionar imagen"}</small><input hidden type="file" accept="image/*" onChange={e=>setFile(e.target.files?.[0]||null)}/></label>}
 export default function App(){
