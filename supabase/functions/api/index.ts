@@ -127,6 +127,27 @@ async function syncStravaUser(userId:string) {
     throw error;
   }
 }
+
+async function ensureStravaWebhook() {
+  if(!STRAVA_CLIENT_SECRET||!STRAVA_VERIFY_TOKEN) throw new Error("Faltan STRAVA_CLIENT_SECRET o STRAVA_WEBHOOK_VERIFY_TOKEN en Supabase.");
+  const base="https://www.strava.com/api/v3/push_subscriptions";
+  const params=new URLSearchParams({client_id:STRAVA_CLIENT_ID,client_secret:STRAVA_CLIENT_SECRET});
+  const check=await fetch(base+"?"+params.toString());
+  if(check.ok) {
+    const existing=await check.json();
+    if(Array.isArray(existing)&&existing.some((x:any)=>x.callback_url==="https://"+new URL(URL).host+"/functions/v1/api/strava-webhook")) return;
+  }
+  const response=await fetch(base,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({
+    client_id:STRAVA_CLIENT_ID,client_secret:STRAVA_CLIENT_SECRET,
+    callback_url:"https://"+new URL(URL).host+"/functions/v1/api/strava-webhook",
+    verify_token:STRAVA_VERIFY_TOKEN
+  })});
+  if(!response.ok) {
+    const detail=await response.text();
+    if(response.status===409) return;
+    throw new Error("No se pudo registrar el webhook de Strava: "+detail.slice(0,220));
+  }
+}
 async function processStravaWebhook(payload:any) {
   if(payload.object_type!=="activity") return;
   const {data:connection}=await db.from("strava_connections").select("*").eq("athlete_id",Number(payload.owner_id)).eq("connected",true).maybeSingle();
@@ -214,7 +235,8 @@ Deno.serve(async req => {
     const me=auth.user, admin=me.role==="admin";
 
     if(path==="strava-connect" && method==="POST") {
-      if(!STRAVA_CLIENT_SECRET||!STRAVA_ENCRYPTION_KEY) return json({error:"La integración todavía requiere configurar los secretos de Strava en Supabase."},503);
+      if(!STRAVA_CLIENT_SECRET||!STRAVA_ENCRYPTION_KEY||!STRAVA_VERIFY_TOKEN) return json({error:"La integración todavía requiere configurar STRAVA_CLIENT_SECRET, STRAVA_TOKEN_ENCRYPTION_KEY y STRAVA_WEBHOOK_VERIFY_TOKEN en Supabase."},503);
+      await ensureStravaWebhook();
       const state=random(24),stateHash=await sha(state);
       await db.from("strava_oauth_states").delete().lt("expires_at",new Date().toISOString());
       const {error}=await db.from("strava_oauth_states").insert({state_hash:stateHash,user_id:me.id,expires_at:new Date(Date.now()+10*60*1000).toISOString()});
