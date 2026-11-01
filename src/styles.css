@@ -4,3 +4,5 @@
 @media(max-width:390px){.run>div:nth-of-type(3){display:none}.topbar{padding:0 9px}.topbar .primary{padding:8px}.stats{grid-template-columns:1fr 1fr}}
 
 .team-avatar{position:relative;width:max-content}.avatar-edit{position:absolute;right:-3px;bottom:-3px;width:24px;height:24px;border-radius:50%;background:#b6f36b;color:#203020;border:2px solid #17221b;display:grid;place-items:center;cursor:pointer}.avatar-edit svg{width:12px;height:12px}.team-card .role{top:24px}
+.rank-tag{position:absolute;right:18px;top:54px;color:#b6f36b;font-size:8px;letter-spacing:1px;font-weight:800}.team-card{position:relative}.team-card .role{top:24px}.team-card .triple{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}.team-card .triple b{font-size:15px}.streak-line{display:flex;align-items:center;gap:5px;color:#b6f36b;font-size:9px;margin:-4px 0 14px}.streak-line span{color:#8c9a8e}.team-card .team-avatar{margin-top:28px}
+@media(max-width:740px){.team-card .triple{grid-template-columns:repeat(4,minmax(0,1fr))}.team-card .triple b{font-size:13px}.rank-tag{top:47px}.team-card .team-avatar{margin-top:23px}}
