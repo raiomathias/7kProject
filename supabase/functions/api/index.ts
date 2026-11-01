@@ -89,7 +89,20 @@ async function saveStravaActivity(userId:string,token:string,summary:any,include
     strava_activity_url:"https://www.strava.com/activities/"+summary.id,elapsed_seconds:Number(detail.elapsed_time||summary.elapsed_time||duration),
     strava_splits:detail.splits_metric??[]
   };
-  const {data:run,error}=await db.from("runs").upsert(row,{onConflict:"strava_activity_id"}).select("id").single();
+  const startMs=new Date(row.run_date).getTime();
+  const {data:nearby}=await db.from("runs").select("id,source,distance_km,duration_seconds,difficulty,notes,strava_activity_id")
+    .eq("user_id",userId).is("strava_activity_id",null)
+    .gte("run_date",new Date(startMs-120000).toISOString()).lte("run_date",new Date(startMs+120000).toISOString()).limit(20);
+  const duplicate=(nearby||[]).find((candidate:any)=>Math.abs(Number(candidate.distance_km)-distance)<=0.05&&Math.abs(Number(candidate.duration_seconds)-duration)<=120);
+  let run:any=null,error:any=null;
+  if(duplicate) {
+    const merged={...row,difficulty:duplicate.difficulty,notes:duplicate.notes||row.notes};
+    const result=await db.from("runs").update(merged).eq("id",duplicate.id).select("id").single();
+    run=result.data; error=result.error;
+  } else {
+    const result=await db.from("runs").upsert(row,{onConflict:"strava_activity_id"}).select("id").single();
+    run=result.data; error=result.error;
+  }
   if(error) throw error;
   let streams:any={};
   if(includeStreams) {
@@ -140,7 +153,10 @@ async function ensureStravaWebhook() {
   const check=await fetch(base+"?"+params.toString());
   if(check.ok) {
     const existing=await check.json();
-    if(Array.isArray(existing)&&existing.some((x:any)=>x.callback_url==="https://"+new URL(URL).host+"/functions/v1/api/strava-webhook")) return;
+    if(Array.isArray(existing)&&existing.length) {
+      if(existing.some((x:any)=>x.callback_url==="https://"+new URL(URL).host+"/functions/v1/api/strava-webhook")) return;
+      throw new Error("La aplicación Strava ya tiene un webhook registrado en otra URL. Elimina la suscripción anterior en Strava antes de conectar.");
+    }
   }
   const response=await fetch(base,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({
     client_id:STRAVA_CLIENT_ID,client_secret:STRAVA_CLIENT_SECRET,
