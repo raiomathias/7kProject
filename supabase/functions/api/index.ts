@@ -114,7 +114,7 @@ async function saveStravaActivity(userId:string,token:string,summary:any,include
     moving_time:detail.moving_time??duration,elapsed_time:detail.elapsed_time??duration,
     streams,splits_metric:detail.splits_metric??[],laps:detail.laps??[],raw_summary:{
       name:detail.name??summary.name??null,description:detail.description??null,device_name:detail.device_name??null,
-      gear_name:detail.gear?.name??null,pr_count:detail.pr_count??null,achievement_count:detail.achievement_count??null
+      gear_name:detail.gear?.name??null,perceived_exertion:detail.perceived_exertion??null,suffer_score:detail.suffer_score??null,pr_count:detail.pr_count??null,achievement_count:detail.achievement_count??null
     },updated_at:new Date().toISOString()
   },{onConflict:"strava_activity_id"});
   if(detailError) throw detailError;
