@@ -254,7 +254,7 @@ Deno.serve(async req => {
     if(path==="public-dashboard" && method==="GET") {
       const [{data:users,error:e1},{data:runs,error:e2},{data:settings,error:e3},{data:events,error:e4}] = await Promise.all([
         db.from("users").select("id,display_name,avatar_path").eq("is_active",true).order("display_name"),
-        db.from("runs").select("id,user_id,run_date,distance_km,duration_seconds,pace_seconds_per_km,difficulty,source").order("run_date",{ascending:false}).limit(1000),
+        db.from("runs").select("id,user_id,run_date,distance_km,duration_seconds,pace_seconds_per_km,difficulty,source,average_heartrate,max_heartrate,average_cadence,total_elevation_gain,elapsed_seconds,average_speed,max_speed,summary_polyline,strava_activity_id").order("run_date",{ascending:false}).limit(1000),
         db.from("goal_settings").select("target_distance_km,deadline,banner_message").eq("id",true).single(),
         db.from("activity_events").select("id,message,created_at").order("created_at",{ascending:false}).limit(20)
       ]);
