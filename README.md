@@ -31,9 +31,12 @@ Las imágenes se convierten en el navegador a WebP, se redimensionan a 1920 px p
 - Resumen del equipo, distancia acumulada, objetivo configurable y avance individual.
 - Registro de distancia, tiempo, ritmo calculado, dificultad, fecha, notas y dos evidencias.
 - Historial filtrable por integrante.
-- Tarjetas de Lukas, Vicente y Mathias, mejor distancia y sesiones.
+- Tarjetas de Lukas, Vicente y Mathias, ranking por distancia acumulada, mejor marca y sesiones.
+- Rachas de días entrenados, ritmo promedio y mejor ritmo individual.
+- Gráficos de distancia acumulada y evolución del ritmo.
+- Cuenta regresiva a la fecha objetivo.
 - Proyección estimada a la meta según ritmo de la sesión.
-- Foto de perfil con compresión automática.
+- Foto de perfil y evidencias de Strava/fotos con compresión automática; miniaturas con enlaces privados temporales.
 - Mathias puede cambiar meta, fecha límite, banner y fotos de los integrantes.
 - Realtime Broadcast para refrescar el panel, con polling de respaldo.
 
