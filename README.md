@@ -9,12 +9,8 @@ Aplicación privada mobile-first para **Lukas, Vicente y Mathias**: objetivo com
 - Realtime Broadcast notifica cambios sin exponer datos de las tablas.
 - Esquema `public` con RLS activo y acceso API directo revocado para `anon` y `authenticated`. Solo Edge Function con clave de servidor opera las tablas.
 
-## Inicialización del proyecto
-1. En Supabase Dashboard abre **Edge Functions → Secrets**.
-2. Crea `BOOTSTRAP_SECRET` con un secreto aleatorio de al menos 32 caracteres. No uses la publishable key ni una contraseña de integrante.
-3. Abre `bootstrap.html` desde el sitio del proyecto (o localmente) y define tres contraseñas únicas de al menos 10 caracteres. Mathias queda como admin, Lukas y Vicente como integrantes.
-4. Inicia la aplicación con `npm install` y `npm run dev`, o publica el contenido con un hosting estático compatible.
-5. La pantalla de configuración inicial solo funciona mientras no exista ningún usuario; una vez creadas las cuentas, el endpoint queda cerrado.
+## Primeros accesos
+Las cuentas de Mathias, Lukas y Vicente se crean directamente en la base de datos. Las contraseñas se guardan únicamente como hashes PBKDF2-SHA256 con salt aleatorio; nunca se almacenan ni se recuperan en texto plano. No existe pantalla ni endpoint de bootstrap.
 
 ## Desarrollo
 ```bash
