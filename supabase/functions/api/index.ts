@@ -28,11 +28,167 @@ async function session(req:Request) {
 async function logEvent(userId:string,type:string,message:string,runId:string|null=null) {
   await db.from("activity_events").insert({user_id:userId,event_type:type,message,run_id:runId});
 }
+
+const STRAVA_CLIENT_ID = Deno.env.get("STRAVA_CLIENT_ID") ?? "292853";
+const STRAVA_CLIENT_SECRET = Deno.env.get("STRAVA_CLIENT_SECRET") ?? "";
+const STRAVA_ENCRYPTION_KEY = Deno.env.get("STRAVA_TOKEN_ENCRYPTION_KEY") ?? "";
+const STRAVA_VERIFY_TOKEN = Deno.env.get("STRAVA_WEBHOOK_VERIFY_TOKEN") ?? "";
+const STRAVA_REDIRECT_URI = URL + "/functions/v1/api/strava-callback";
+const APP_RETURN_URL = "https://raiomathias.github.io/7kProject/panel/?strava=connected";
+const b64 = (bytes:Uint8Array) => btoa(String.fromCharCode(...bytes));
+const unb64 = (value:string) => Uint8Array.from(atob(value),c=>c.charCodeAt(0));
+async function encryptionKey() {
+  if(!STRAVA_ENCRYPTION_KEY) throw new Error("Falta configurar STRAVA_TOKEN_ENCRYPTION_KEY.");
+  const raw=unb64(STRAVA_ENCRYPTION_KEY);
+  if(raw.length!==32) throw new Error("STRAVA_TOKEN_ENCRYPTION_KEY debe ser una clave Base64 de 32 bytes.");
+  return crypto.subtle.importKey("raw",raw,{name:"AES-GCM"},false,["encrypt","decrypt"]);
+}
+async function encryptToken(value:string) {
+  const nonce=crypto.getRandomValues(new Uint8Array(12)), key=await encryptionKey();
+  const cipher=await crypto.subtle.encrypt({name:"AES-GCM",iv:nonce},key,new TextEncoder().encode(value));
+  return {cipher:b64(new Uint8Array(cipher)),nonce:b64(nonce)};
+}
+async function decryptToken(cipher:string,nonce:string) {
+  const key=await encryptionKey();
+  const clear=await crypto.subtle.decrypt({name:"AES-GCM",iv:unb64(nonce)},key,unb64(cipher));
+  return new TextDecoder().decode(clear);
+}
+async function stravaRefresh(connection:any) {
+  if(Number(connection.expires_at)>Math.floor(Date.now()/1000)+300) return await decryptToken(connection.access_token_cipher,connection.access_token_nonce);
+  if(!STRAVA_CLIENT_SECRET) throw new Error("Falta configurar STRAVA_CLIENT_SECRET.");
+  const refresh=await decryptToken(connection.refresh_token_cipher,connection.refresh_token_nonce);
+  const response=await fetch("https://www.strava.com/oauth/token",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({client_id:STRAVA_CLIENT_ID,client_secret:STRAVA_CLIENT_SECRET,grant_type:"refresh_token",refresh_token:refresh})});
+  const data=await response.json();
+  if(!response.ok) throw new Error(data.message||"No se pudo renovar el acceso a Strava.");
+  const access=await encryptToken(data.access_token), nextRefresh=await encryptToken(data.refresh_token);
+  await db.from("strava_connections").update({access_token_cipher:access.cipher,access_token_nonce:access.nonce,refresh_token_cipher:nextRefresh.cipher,refresh_token_nonce:nextRefresh.nonce,expires_at:data.expires_at,updated_at:new Date().toISOString(),last_sync_error:null}).eq("user_id",connection.user_id);
+  return data.access_token as string;
+}
+async function stravaRequest(token:string,path:string) {
+  const response=await fetch("https://www.strava.com/api/v3"+path,{headers:{Authorization:"Bearer "+token}});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok) throw new Error(data.message||"Strava API respondió "+response.status);
+  return data;
+}
+async function saveStravaActivity(userId:string,token:string,summary:any,includeStreams=false) {
+  const kind=String(summary.sport_type||summary.type||"");
+  if(!["Run","TrailRun","VirtualRun"].includes(kind)) return null;
+  const detail=await stravaRequest(token,"/activities/"+summary.id);
+  const distance=Number(detail.distance||summary.distance)/1000;
+  const duration=Math.max(1,Math.round(Number(detail.moving_time||summary.moving_time)));
+  if(!Number.isFinite(distance)||distance<=0||distance>100||duration>86400) return null;
+  const row={
+    user_id:userId,run_date:detail.start_date||summary.start_date,distance_km:Number(distance.toFixed(2)),
+    duration_seconds:duration,difficulty:7,notes:"Importada desde Strava · "+String(detail.name||summary.name||"Corrida").slice(0,100),
+    source:"strava",strava_activity_id:Number(summary.id),average_heartrate:detail.average_heartrate??null,
+    max_heartrate:detail.max_heartrate??null,average_cadence:detail.average_cadence??null,
+    total_elevation_gain:detail.total_elevation_gain??null,average_speed:detail.average_speed??null,
+    max_speed:detail.max_speed??null,calories:detail.calories??null,
+    summary_polyline:detail.map?.summary_polyline??summary.map?.summary_polyline??null,
+    start_latitude:detail.start_latlng?.[0]??null,start_longitude:detail.start_latlng?.[1]??null,
+    strava_activity_url:"https://www.strava.com/activities/"+summary.id,elapsed_seconds:Number(detail.elapsed_time||summary.elapsed_time||duration),
+    strava_splits:detail.splits_metric??[]
+  };
+  const {data:run,error}=await db.from("runs").upsert(row,{onConflict:"strava_activity_id"}).select("id").single();
+  if(error) throw error;
+  let streams:any={};
+  if(includeStreams) {
+    try { streams=await stravaRequest(token,"/activities/"+summary.id+"/streams?keys=time,distance,latlng,altitude,heartrate,cadence,velocity_smooth,grade_smooth&key_by_type=true"); } catch(e) { console.warn("Strava streams unavailable",e); }
+  }
+  const {error:detailError}=await db.from("strava_activity_details").upsert({
+    strava_activity_id:Number(summary.id),user_id:userId,run_id:run.id,activity_type:kind,
+    timezone:detail.timezone??null,start_date_local:detail.start_date_local??null,
+    moving_time:detail.moving_time??duration,elapsed_time:detail.elapsed_time??duration,
+    streams,splits_metric:detail.splits_metric??[],laps:detail.laps??[],raw_summary:{
+      name:detail.name??summary.name??null,description:detail.description??null,device_name:detail.device_name??null,
+      gear_name:detail.gear?.name??null,pr_count:detail.pr_count??null,achievement_count:detail.achievement_count??null
+    },updated_at:new Date().toISOString()
+  },{onConflict:"strava_activity_id"});
+  if(detailError) throw detailError;
+  return run.id;
+}
+async function syncStravaUser(userId:string) {
+  const {data:connection,error}=await db.from("strava_connections").select("*").eq("user_id",userId).eq("connected",true).maybeSingle();
+  if(error||!connection) throw new Error("No hay una cuenta Strava conectada.");
+  try {
+    const token=await stravaRefresh(connection);
+    const activities=await stravaRequest(token,"/athlete/activities?per_page=100&page=1");
+    const running=(activities||[]).filter((a:any)=>["Run","TrailRun","VirtualRun"].includes(String(a.sport_type||a.type)));
+    let imported=0,details=0;
+    for(const activity of running) {
+      await saveStravaActivity(userId,token,activity,details<12);
+      imported++; if(details<12) details++;
+    }
+    await db.from("strava_connections").update({last_sync_at:new Date().toISOString(),last_sync_error:null,updated_at:new Date().toISOString()}).eq("user_id",userId);
+    await logEvent(userId,"strava_sync", "Sincronizó "+imported+" corridas desde Strava");
+    return {imported,checked:activities.length,detailed:details};
+  } catch(error) {
+    await db.from("strava_connections").update({last_sync_error:String((error as Error)?.message||"Error de sincronización").slice(0,400)}).eq("user_id",userId);
+    throw error;
+  }
+}
+async function processStravaWebhook(payload:any) {
+  if(payload.object_type!=="activity") return;
+  const {data:connection}=await db.from("strava_connections").select("*").eq("athlete_id",Number(payload.owner_id)).eq("connected",true).maybeSingle();
+  if(!connection) return;
+  const activityId=Number(payload.object_id);
+  if(payload.aspect_type==="delete") {
+    const {data:run}=await db.from("runs").select("id").eq("strava_activity_id",activityId).maybeSingle();
+    if(run) await db.from("runs").delete().eq("id",run.id);
+    return;
+  }
+  const token=await stravaRefresh(connection);
+  const detail=await stravaRequest(token,"/activities/"+activityId);
+  await saveStravaActivity(connection.user_id,token,detail,true);
+  await db.from("strava_connections").update({updated_at:new Date().toISOString()}).eq("user_id",connection.user_id);
+}
 Deno.serve(async req => {
   if(req.method==="OPTIONS") return new Response("ok",{headers:cors});
   try {
     const url=new URL(req.url), path=url.pathname.split("/").filter(Boolean).pop() ?? "", method=req.method;
     const body=method==="GET"?{}:await req.json().catch(()=>({}));
+
+    if(path==="strava-webhook" && method==="GET") {
+      const mode=url.searchParams.get("hub.mode"),verify=url.searchParams.get("hub.verify_token"),challenge=url.searchParams.get("hub.challenge");
+      if(mode==="subscribe" && STRAVA_VERIFY_TOKEN && verify===STRAVA_VERIFY_TOKEN) return json({"hub.challenge":challenge});
+      return json({error:"Verificación de webhook no válida."},403);
+    }
+    if(path==="strava-webhook" && method==="POST") {
+      const payload=body;
+      if(!payload.object_type||!payload.object_id||!payload.aspect_type||!payload.owner_id) return json({error:"Evento inválido."},400);
+      const {data:event,error}=await db.from("strava_webhook_events").insert({
+        object_type:payload.object_type,object_id:payload.object_id,aspect_type:payload.aspect_type,
+        owner_id:payload.owner_id,updates:payload.updates||{},event_time:payload.event_time||null,payload
+      }).select("id").single();
+      if(error) throw error;
+      const work=processStravaWebhook(payload).then(async()=>{await db.from("strava_webhook_events").update({processed_at:new Date().toISOString()}).eq("id",event.id)}).catch(async(e)=>{await db.from("strava_webhook_events").update({error:String(e?.message||e).slice(0,400)}).eq("id",event.id)});
+      (globalThis as any).EdgeRuntime?.waitUntil?.(work);
+      return json({received:true});
+    }
+    if(path==="strava-callback" && method==="GET") {
+      const code=url.searchParams.get("code")||"",state=url.searchParams.get("state")||"",error=url.searchParams.get("error");
+      if(error||!code||!state||!STRAVA_CLIENT_SECRET) return Response.redirect("https://raiomathias.github.io/7kProject/panel/?strava=error",302);
+      const {data:oauth}=await db.from("strava_oauth_states").select("user_id,expires_at").eq("state_hash",await sha(state)).gt("expires_at",new Date().toISOString()).maybeSingle();
+      if(!oauth) return Response.redirect("https://raiomathias.github.io/7kProject/panel/?strava=state_error",302);
+      await db.from("strava_oauth_states").delete().eq("state_hash",await sha(state));
+      const response=await fetch("https://www.strava.com/oauth/token",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({client_id:STRAVA_CLIENT_ID,client_secret:STRAVA_CLIENT_SECRET,code,grant_type:"authorization_code"})});
+      const data=await response.json();
+      if(!response.ok||!data.athlete?.id) return Response.redirect("https://raiomathias.github.io/7kProject/panel/?strava=exchange_error",302);
+      const {data:existing}=await db.from("strava_connections").select("user_id").eq("athlete_id",Number(data.athlete.id)).maybeSingle();
+      if(existing&&existing.user_id!==oauth.user_id) return Response.redirect("https://raiomathias.github.io/7kProject/panel/?strava=already_linked",302);
+      const access=await encryptToken(data.access_token),refresh=await encryptToken(data.refresh_token);
+      const {error:saveError}=await db.from("strava_connections").upsert({
+        user_id:oauth.user_id,athlete_id:Number(data.athlete.id),athlete_username:data.athlete.username??null,
+        athlete_firstname:data.athlete.firstname??null,athlete_lastname:data.athlete.lastname??null,
+        athlete_profile:data.athlete.profile??data.athlete.profile_medium??null,
+        access_token_cipher:access.cipher,access_token_nonce:access.nonce,
+        refresh_token_cipher:refresh.cipher,refresh_token_nonce:refresh.nonce,
+        expires_at:data.expires_at,scopes:String(url.searchParams.get("scope")||"activity:read_all"),
+        connected:true,last_sync_error:null,updated_at:new Date().toISOString()
+      },{onConflict:"user_id"});
+      if(saveError) throw saveError;
+      return Response.redirect(APP_RETURN_URL,302);
+    }
     if(path==="login" && method==="POST") {
       const username=String(body.username??"").trim().toLowerCase(), password=String(body.password??"");
       if(!username||!password||password.length>256) return json({error:"Usuario o contraseña incorrectos."},401);
@@ -56,6 +212,43 @@ Deno.serve(async req => {
     const auth=await session(req);
     if(!auth) return json({error:"Sesión inválida o expirada. Inicia sesión nuevamente."},401);
     const me=auth.user, admin=me.role==="admin";
+
+    if(path==="strava-connect" && method==="POST") {
+      if(!STRAVA_CLIENT_SECRET||!STRAVA_ENCRYPTION_KEY) return json({error:"La integración todavía requiere configurar los secretos de Strava en Supabase."},503);
+      const state=random(24),stateHash=await sha(state);
+      await db.from("strava_oauth_states").delete().lt("expires_at",new Date().toISOString());
+      const {error}=await db.from("strava_oauth_states").insert({state_hash:stateHash,user_id:me.id,expires_at:new Date(Date.now()+10*60*1000).toISOString()});
+      if(error) throw error;
+      const authorize=new URL("https://www.strava.com/oauth/authorize");
+      authorize.searchParams.set("client_id",STRAVA_CLIENT_ID);
+      authorize.searchParams.set("redirect_uri",STRAVA_REDIRECT_URI);
+      authorize.searchParams.set("response_type","code");
+      authorize.searchParams.set("approval_prompt","auto");
+      authorize.searchParams.set("scope","read,activity:read_all");
+      authorize.searchParams.set("state",state);
+      return json({authorize_url:authorize.toString()});
+    }
+    if(path==="strava-status" && method==="GET") {
+      const {data:connection,error}=await db.from("strava_connections").select("athlete_id,athlete_username,athlete_firstname,athlete_lastname,athlete_profile,scopes,last_sync_at,last_sync_error,connected").eq("user_id",me.id).maybeSingle();
+      if(error) throw error;
+      return json({connected:!!connection?.connected,connection:connection||null});
+    }
+    if(path==="strava-sync" && method==="POST") {
+      const result=await syncStravaUser(me.id);
+      return json({success:true,...result});
+    }
+    if(path==="strava-disconnect" && method==="POST") {
+      const {data:connection}=await db.from("strava_connections").select("*").eq("user_id",me.id).maybeSingle();
+      if(connection) {
+        try {
+          const token=await stravaRefresh(connection);
+          await fetch("https://www.strava.com/oauth/deauthorize",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({access_token:token})});
+        } catch(e) { console.warn("Strava deauthorization request failed",e); }
+        await db.from("strava_connections").delete().eq("user_id",me.id);
+      }
+      return json({success:true});
+    }
+
     if(path==="logout" && method==="POST") {
       await db.from("sessions").update({revoked_at:new Date().toISOString()}).eq("id",auth.session.id);
       return json({success:true});
