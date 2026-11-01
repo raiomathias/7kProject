@@ -230,3 +230,5 @@ body{background:#0e1113;color:#f1f3f5}
 .public-member-card .public-member-details{padding-top:11px}
 @media(max-width:740px){.public-header-actions{gap:5px}.update-notice{font-size:8px;gap:5px;padding:4px}.update-notice button{font-size:8px;padding:5px 7px}}
 @media(max-width:480px){.public-header-actions .update-notice{max-width:145px;white-space:normal;line-height:1.2}.public-header-actions .version-badge{display:none}}
+
+.goal-fixed-note{display:grid;gap:5px;padding:12px 14px;border:1px solid #3b4c3c;border-radius:9px;background:#19231b}.goal-fixed-note b{font:800 13px Manrope;color:#b8e889}.goal-fixed-note small{font-size:10px;color:#a5b1a5}
