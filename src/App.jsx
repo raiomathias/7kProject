@@ -2,10 +2,11 @@ import {useCallback,useEffect,useMemo,useState} from "react";
 import {Activity,ArrowRight,CalendarDays,Check,ChevronLeft,ChevronRight,Clock3,Flame,Gauge,Heart,Home,LogOut,Menu,Mountain,Plus,ShieldCheck,Sparkles,Target,Trophy,Users,X,ImagePlus,Upload,Settings2,KeyRound,Link2,RefreshCw,Unlink,ActivitySquare} from "lucide-react";
 import {Area,AreaChart,CartesianGrid,ResponsiveContainer,Tooltip,XAxis,YAxis,Line,LineChart} from "recharts";
 import {api,supabase} from "./lib/supabase";
+import {estimateSevenK,recentSevenDayRuns} from "./lib/estimate7k";
 import {compressImage} from "./lib/images";
 const date=d=>new Intl.DateTimeFormat("es-CL",{day:"2-digit",month:"short",year:"numeric"}).format(new Date(typeof d==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(d)?d+"T12:00:00":d));
 const time=s=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60),v=s%60;return h?`${h}:${String(m).padStart(2,"0")}:${String(v).padStart(2,"0")}`:`${m}:${String(v).padStart(2,"0")}`};
-const APP_VERSION="1.10";
+const APP_VERSION="1.11";
 const pace=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 const durationDigits=value=>String(value??"").replace(/[^0-9]/g,"").slice(0,4);
 const durationSeconds=value=>{const raw=String(value??"").trim();if(raw.includes(":")){const p=raw.split(":").map(Number);if(p.length===2)return (p[0]||0)*60+(p[1]||0);if(p.length===3)return (p[0]||0)*3600+(p[1]||0)*60+(p[2]||0)}const d=durationDigits(raw).padStart(4,"0");return Number(d.slice(0,2))*60+Number(d.slice(2))};
@@ -16,79 +17,7 @@ const streakFor=own=>{const days=[...new Set(own.map(r=>dayKey(r.run_date)))].so
 
 const effortLabels={1:"Muy fácil",2:"Fácil",3:"Fácil",4:"Moderado",5:"Moderado",6:"Algo exigente",7:"Exigente",8:"Muy exigente",9:"Muy duro",10:"Esfuerzo máximo"};
 const weekStartKey=value=>{const d=new Date(value);const key=dayKey(d),utc=new Date(key+"T00:00:00Z");utc.setUTCDate(utc.getUTCDate()-((utc.getUTCDay()+6)%7));return utc.toISOString().slice(0,10)};
-const runLocalDayKey=r=>{
- const local=r?.detail?.start_date_local;
- if(typeof local==="string"&&/^\d{4}-\d{2}-\d{2}/.test(local))return local.slice(0,10);
- const value=r?.run_date;
- if(typeof value==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(value))return value;
- const parsed=new Date(value);
- return Number.isFinite(parsed.getTime())?dayKey(parsed):"";
-};
-const recentSevenDayRuns=(runs,now=Date.now())=>{
- const today=dayKey(now),start=new Date(today+"T12:00:00Z");
- start.setUTCDate(start.getUTCDate()-6);
- const first=start.toISOString().slice(0,10);
- return (Array.isArray(runs)?runs:[]).filter(r=>{
-  const key=runLocalDayKey(r),km=Number(r.distance_km),seconds=Number(r.duration_seconds);
-  return key>=first&&key<=today&&Number.isFinite(km)&&km>=0.8&&km<=42&&Number.isFinite(seconds)&&seconds>0&&seconds<=86400;
- });
-};
-const estimateSevenK=(runs,now=Date.now())=>{
- const week=recentSevenDayRuns(runs,now);
- if(!week.length)return null;
- const today=dayKey(now),startDate=new Date(today+"T12:00:00Z");
- startDate.setUTCDate(startDate.getUTCDate()-6);
- const from=startDate.toISOString().slice(0,10);
- const candidates=week.map(r=>{
-  const km=Number(r.distance_km),detail=r.detail||{},streams=detail.streams||{};
-  const streamValues=key=>(Array.isArray(streams[key]?.data)?streams[key].data:[]).map(Number).filter(v=>Number.isFinite(v)&&v>0);
-  const hrValues=streamValues("heartrate"),speedValues=streamValues("velocity_smooth"),gradeValues=(Array.isArray(streams.grade_smooth?.data)?streams.grade_smooth.data:[]).map(Number).filter(Number.isFinite);
-  const hr=Number(r.average_heartrate)>0?Number(r.average_heartrate):hrValues.length?hrValues.reduce((a,b)=>a+b,0)/hrValues.length:0;
-  const maxHr=Number(r.max_heartrate)>0?Number(r.max_heartrate):hrValues.length?Math.max(...hrValues):0;
-  const elevation=Math.max(0,Number(r.total_elevation_gain)||0);
-  const moving=Number(detail.moving_time)||Number(r.duration_seconds);
-  const elapsed=Math.max(moving,Number(detail.elapsed_time)||Number(r.elapsed_seconds)||moving);
-  const seconds=moving;
-  const paceSec=seconds/km;
-  const source=String(r.source||"manual");
-  const importedRpe=Number(detail.raw_summary?.perceived_exertion);
-  const rawRpe=source==="strava"?(Number.isFinite(importedRpe)?importedRpe:NaN):Number(r.difficulty);
-  const rpe=Number.isFinite(rawRpe)&&rawRpe>=1&&rawRpe<=10?rawRpe:null;
-  const elevationPerKm=elevation/km;
-  const hrRatio=hr&&maxHr?Math.min(1.15,hr/maxHr):0;
-  const gradeAvg=gradeValues.length?gradeValues.reduce((a,b)=>a+b,0)/gradeValues.length:0;
-  const stopRatio=Math.max(0,(elapsed-moving)/Math.max(1,elapsed));
-  const exponent=1.06+(km<3?0.015:km<5?0.008:0);
-  let effortFactor=rpe===null?1:Math.max(.94,Math.min(1.06,1+(rpe-6)*.012));
-  const heartFactor=hrRatio?Math.max(.97,Math.min(1.03,1+(hrRatio-.92)*.10)):1;
-  const gradePenalty=Math.max(0,gradeAvg)/100;
-  const hillFactor=1+Math.min(.065,Math.max(0,elevationPerKm-8)*.00055+gradePenalty*.08);
-  const pauseFactor=1+Math.min(.04,stopRatio*.10);
-  const projected=paceSec*Math.pow(7/km,exponent)*7*effortFactor*heartFactor*hillFactor*pauseFactor;
-  const day=runLocalDayKey(r),ageDays=Math.max(0,(new Date(today+"T12:00:00-03:00").getTime()-new Date(day+"T12:00:00-03:00").getTime())/86400000);
-  const gps=!!(r.summary_polyline||streams.latlng?.data?.length);
-  const cadence=Number(r.average_cadence)||0;
-  const completeness=(hr?1:0)+(elevation?1:0)+(cadence?1:0)+(gps?1:0)+(speedValues.length?1:0)+(gradeValues.length?1:0);
-  const distanceWeight=Math.min(1.8,Math.max(.65,Math.sqrt(km/3)));
-  const recencyWeight=Math.exp(-ageDays/5);
-  const weight=distanceWeight*recencyWeight;
-  return {seconds:projected,weight,km,paceSec,rpe,hr,elevation,cadence,elevationPerKm,hrRatio,ageDays,completeness,runDate:day,source,gps,hasStreams:!!Object.keys(streams).length};
- });
- const sorted=candidates.map(c=>c.seconds).sort((a,b)=>a-b);
- const median=sorted[Math.floor(sorted.length/2)];
- const deviations=candidates.map(c=>Math.abs(c.seconds-median)).sort((a,b)=>a-b);
- const mad=deviations[Math.floor(deviations.length/2)]||0;
- const cap=Math.max(90,2.5*mad);
- const adjusted=candidates.map(c=>({...c,adjustedSeconds:Math.max(median-cap,Math.min(median+cap,c.seconds))}));
- const totalWeight=adjusted.reduce((a,c)=>a+c.weight,0);
- const weighted=adjusted.reduce((a,c)=>a+c.adjustedSeconds*c.weight,0)/Math.max(.001,totalWeight);
- const spread=Math.sqrt(adjusted.reduce((a,c)=>a+c.weight*Math.pow(c.adjustedSeconds-weighted,2),0)/Math.max(.001,totalWeight));
- const maxDistance=Math.max(...candidates.map(c=>c.km));
- const dataScore=candidates.reduce((a,c)=>a+c.completeness,0)/candidates.length;
- const hrRuns=candidates.filter(c=>c.hr),rpeRuns=candidates.filter(c=>c.rpe!==null);
- const confidence=candidates.length>=4&&maxDistance>=5&&spread<360?"Alta":candidates.length>=2&&maxDistance>=3?"Media":"Inicial";
- return {conservative:Math.round(weighted),pace:Math.round(weighted/7),base:Math.round(weighted),count:week.length,used:week.length,excluded:0,adjustedOutliers:candidates.filter(c=>Math.abs(c.seconds-c.adjustedSeconds)>1).length,confidence,spread:Math.round(spread),bestCoverage:maxDistance,avgRpe:rpeRuns.length?rpeRuns.reduce((a,c)=>a+c.rpe,0)/rpeRuns.length:null,avgHr:hrRuns.length?hrRuns.reduce((a,c)=>a+c.hr,0)/hrRuns.length:0,avgElevation:candidates.reduce((a,c)=>a+c.elevation,0)/candidates.length,gpsCount:candidates.filter(c=>c.gps).length,detailScore:dataScore,from,to:today,runs:week,candidates:adjusted};
-};
+
 function DateTimeField({value,onChange,withTime=true,label="Fecha y hora"}){
  const [open,setOpen]=useState(false);
  const [hour,setHour]=useState((value?.slice(11,13)||"12"));
