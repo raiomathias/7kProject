@@ -232,3 +232,36 @@ body{background:#0e1113;color:#f1f3f5}
 @media(max-width:480px){.public-header-actions .update-notice{max-width:145px;white-space:normal;line-height:1.2}.public-header-actions .version-badge{display:none}}
 
 .goal-fixed-note{display:grid;gap:5px;padding:12px 14px;border:1px solid #3b4c3c;border-radius:9px;background:#19231b}.goal-fixed-note b{font:800 13px Manrope;color:#b8e889}.goal-fixed-note small{font-size:10px;color:#a5b1a5}
+
+
+/* v1.2 weekly training summary and individual 7K forecast */
+.weekly-summary{margin:22px 0 28px;padding:20px;background:#171e20;border:1px solid #303b3d;border-radius:15px}
+.weekly-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:16px}
+.weekly-heading>div:first-child>small{color:#a8d86b;font-size:9px;font-weight:800;letter-spacing:1.3px}
+.weekly-heading h2{font:800 21px Manrope;margin:6px 0;color:#eef1ed}
+.weekly-heading p{font-size:11px;color:#9ba6a5;line-height:1.55;margin:0;max-width:620px}
+.weekly-team-total{display:flex;flex-direction:column;gap:5px;min-width:170px;padding:12px 14px;border:1px solid #34423d;border-radius:11px;background:#1b2920}
+.weekly-team-total small,.weekly-metrics small,.weekly-goal-line span,.weekly-prediction>small{font-size:8px;letter-spacing:.9px;font-weight:800;color:#9ba6a5}
+.weekly-team-total b{font:900 24px Manrope;color:#c1ed8c}
+.weekly-team-total span{font-size:9px;color:#a5b1a5}
+.weekly-members{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+.weekly-member{min-width:0;padding:14px;border:1px solid #303b3d;border-radius:12px;background:#111719}
+.weekly-member-head{display:flex;align-items:center;gap:9px}
+.weekly-member-head .avatar{width:36px;height:36px;flex:0 0 36px}
+.weekly-member-head>div{display:grid;gap:3px}.weekly-member-head b{font:800 13px Manrope;color:#edf1ed}.weekly-member-head small{font-size:9px;color:#899796}
+.weekly-metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:13px 0;border-bottom:1px solid #2b3638}
+.weekly-metrics>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.weekly-metrics b{font:800 17px Manrope;color:#edf1ed}
+.weekly-goal-line{padding:12px 0;border-bottom:1px solid #2b3638}
+.weekly-goal-line>div:first-child{display:flex;flex-direction:column;gap:5px}
+.weekly-goal-line>div:first-child b{font:800 12px Manrope;color:#c1ed8c}
+.weekly-goal-line>.track{height:6px;margin:9px 0 6px;background:#35423a;border-radius:8px;overflow:hidden}
+.weekly-goal-line>.track i{display:block;height:100%;background:#a8d86b;border-radius:8px}
+.weekly-goal-line>small{font-size:9px;color:#9ba6a5}
+.weekly-prediction{padding-top:11px;display:flex;flex-direction:column;gap:5px}
+.weekly-prediction b{font:900 20px Manrope;color:#c1ed8c}
+.weekly-prediction b span{font:700 11px "DM Sans";color:#dce6d9}
+.weekly-prediction p{font-size:9px;line-height:1.55;color:#929e9b;margin:0}
+.weekly-footnote{font-size:9px;line-height:1.6;color:#84918d;margin:13px 2px 0}
+@media(max-width:850px){.weekly-members{grid-template-columns:1fr}.weekly-heading{flex-direction:column}.weekly-team-total{width:100%}}
+@media(max-width:600px){.weekly-summary{padding:14px;margin:17px 0 22px}.weekly-heading h2{font-size:18px}.weekly-member{padding:12px}}
