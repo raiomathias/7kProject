@@ -5,7 +5,7 @@ import {api,supabase} from "./lib/supabase";
 import {compressImage} from "./lib/images";
 const date=d=>new Intl.DateTimeFormat("es-CL",{day:"2-digit",month:"short",year:"numeric"}).format(new Date(d));
 const time=s=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60),v=s%60;return h?`${h}:${String(m).padStart(2,"0")}:${String(v).padStart(2,"0")}`:`${m}:${String(v).padStart(2,"0")}`};
-const APP_VERSION="1.7";
+const APP_VERSION="1.8";
 const pace=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 const durationDigits=value=>String(value??"").replace(/[^0-9]/g,"").slice(0,4);
 const durationSeconds=value=>{const raw=String(value??"").trim();if(raw.includes(":")){const p=raw.split(":").map(Number);if(p.length===2)return (p[0]||0)*60+(p[1]||0);if(p.length===3)return (p[0]||0)*3600+(p[1]||0)*60+(p[2]||0)}const d=durationDigits(raw).padStart(4,"0");return Number(d.slice(0,2))*60+Number(d.slice(2))};
@@ -97,7 +97,7 @@ export default function App(){
  const routeFromLocation=()=>{const p=window.location.pathname;const local=p.startsWith(basePath)?p.slice(basePath.length):p.replace(/^\//,"");return local.replace(/^\/+|\/+$/g,"");};
  const [updateAvailable,setUpdateAvailable]=useState(false);const [latestVersion,setLatestVersion]=useState(APP_VERSION);
  useEffect(()=>{let active=true;let checking=false;const check=async()=>{if(checking)return;checking=true;try{const response=await fetch(basePath+"version.json?check="+Date.now()+"-"+Math.random().toString(36).slice(2),{cache:"no-store",headers:{"Cache-Control":"no-cache","Pragma":"no-cache"}});if(!response.ok)return;const remote=await response.json();const latest=String(remote.version||"").trim();if(!latest)return;const newer=latest.localeCompare(APP_VERSION,undefined,{numeric:true,sensitivity:"base"})>0;if(active){setLatestVersion(latest);setUpdateAvailable(newer)}}catch{}finally{checking=false}};check();const id=setInterval(check,20000);const onFocus=()=>check();const onVisible=()=>{if(document.visibilityState==="visible")check()};window.addEventListener("focus",onFocus);document.addEventListener("visibilitychange",onVisible);return()=>{active=false;clearInterval(id);window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onVisible)}},[basePath]);
- const reloadApp=()=>{window.location.replace(window.location.pathname+window.location.search+((window.location.search?"&":"?")+"reload="+Date.now()));};
+ const reloadApp=()=>{const target=route==="panel"?"panel":"";const url=basePath+"?v="+encodeURIComponent(latestVersion||APP_VERSION)+"&reload="+Date.now()+(target?"&route="+target:"");window.location.replace(url);};
  const [route,setRoute]=useState(routeFromLocation);
  const navigate=path=>{const url=path==="panel"?basePath+"panel/":basePath;window.history.pushState({}, "", url);setRoute(path==="panel"?"panel":"home");};
  useEffect(()=>{const pop=()=>setRoute(routeFromLocation());window.addEventListener("popstate",pop);return()=>window.removeEventListener("popstate",pop)},[]);
