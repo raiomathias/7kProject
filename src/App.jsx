@@ -3,7 +3,7 @@ import {Activity,ArrowRight,CalendarDays,Check,ChevronLeft,ChevronRight,Clock3,F
 import {Area,AreaChart,CartesianGrid,ResponsiveContainer,Tooltip,XAxis,YAxis,Line,LineChart} from "recharts";
 import {api,supabase} from "./lib/supabase";
 import {compressImage} from "./lib/images";
-const date=d=>new Intl.DateTimeFormat("es-CL",{day:"2-digit",month:"short",year:"numeric"}).format(new Date(d));
+const date=d=>new Intl.DateTimeFormat("es-CL",{day:"2-digit",month:"short",year:"numeric"}).format(new Date(typeof d==="string"&&/^\\d{4}-\\d{2}-\\d{2}$/.test(d)?d+"T12:00:00":d));
 const time=s=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60),v=s%60;return h?`${h}:${String(m).padStart(2,"0")}:${String(v).padStart(2,"0")}`:`${m}:${String(v).padStart(2,"0")}`};
 const APP_VERSION="1.9";
 const pace=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
