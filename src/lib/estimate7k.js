@@ -17,9 +17,9 @@ const dayOrdinal=key=>{
 };
 const runDayKey=r=>{
  const local=r?.detail?.start_date_local;
- if(typeof local==="string"&&/^\\d{4}-\\d{2}-\\d{2}/.test(local))return local.slice(0,10);
+ if(typeof local==="string"&&/^\d{4}-\d{2}-\d{2}/.test(local))return local.slice(0,10);
  const value=r?.run_date;
- if(typeof value==="string"&&/^\\d{4}-\\d{2}-\\d{2}$/.test(value))return value;
+ if(typeof value==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(value))return value;
  return dateKeyInSantiago(value);
 };
 export const recentSevenDayRuns=(runs,now=Date.now())=>{
