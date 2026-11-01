@@ -79,6 +79,18 @@ begin
   end loop;
 end $$;
 
+create table if not exists public.login_attempts (
+  id bigint generated always as identity primary key,
+  username text not null,
+  ip_hash text not null,
+  attempted_at timestamptz not null default now()
+);
+create index if not exists login_attempts_rate_idx on public.login_attempts(username,ip_hash,attempted_at desc);
+alter table public.login_attempts enable row level security;
+revoke all on public.login_attempts from public,anon,authenticated;
+grant select,insert,update,delete on public.login_attempts to service_role;
+create policy deny_api_roles on public.login_attempts for all to anon,authenticated using(false) with check(false);
+
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
 values('7k-media','7k-media',false,8388608,array['image/webp'])
 on conflict(id) do update set public=false,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
