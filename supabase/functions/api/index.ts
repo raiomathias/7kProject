@@ -132,6 +132,16 @@ Deno.serve(async req => {
       if(body.is_active===false) await db.from("sessions").update({revoked_at:new Date().toISOString()}).eq("user_id",id).is("revoked_at",null);
       return json({user:data});
     }
+    if(path==="media" && method==="POST") {
+      const paths=Array.isArray(body.paths)?body.paths.slice(0,4):[];
+      const media:Record<string,string>={};
+      for(const objectPath of paths) {
+        if(typeof objectPath!=="string" || !objectPath.startsWith("runs/") || !objectPath.endsWith(".webp")) continue;
+        const {data:signed,error}=await db.storage.from("7k-media").createSignedUrl(objectPath,3600);
+        if(!error && signed?.signedUrl) media[objectPath]=signed.signedUrl;
+      }
+      return json({media});
+    }
     if(path==="upload" && method==="POST") {
       const bucket=db.storage.from("7k-media");
       const folder=String(body.folder??"runs");
