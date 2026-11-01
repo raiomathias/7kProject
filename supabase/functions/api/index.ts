@@ -1,11 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
-const URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SECRET_KEYS = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}");
 const KEY = SECRET_KEYS.default ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 if (!KEY) throw new Error("Missing Supabase server secret key");
-const db = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+const db = createClient(SUPABASE_URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type", "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS", "Content-Type": "application/json" };
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: cors });
 const sha = async (v: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v)))).map(x=>x.toString(16).padStart(2,"0")).join("");
@@ -33,7 +33,7 @@ const STRAVA_CLIENT_ID = Deno.env.get("STRAVA_CLIENT_ID") ?? "292853";
 const STRAVA_CLIENT_SECRET = Deno.env.get("STRAVA_CLIENT_SECRET") ?? "";
 const STRAVA_ENCRYPTION_KEY = Deno.env.get("STRAVA_TOKEN_ENCRYPTION_KEY") ?? "";
 const STRAVA_VERIFY_TOKEN = Deno.env.get("STRAVA_WEBHOOK_VERIFY_TOKEN") ?? "";
-const STRAVA_REDIRECT_URI = URL + "/functions/v1/api/strava-callback";
+const STRAVA_REDIRECT_URI = SUPABASE_URL + "/functions/v1/api/strava-callback";
 const APP_RETURN_URL = "https://raiomathias.github.io/7kProject/panel/?strava=connected";
 const b64 = (bytes:Uint8Array) => btoa(String.fromCharCode(...bytes));
 const unb64 = (value:string) => Uint8Array.from(atob(value),c=>c.charCodeAt(0));
@@ -154,13 +154,13 @@ async function ensureStravaWebhook() {
   if(check.ok) {
     const existing=await check.json();
     if(Array.isArray(existing)&&existing.length) {
-      if(existing.some((x:any)=>x.callback_url==="https://"+new URL(URL).host+"/functions/v1/api/strava-webhook")) return;
+      if(existing.some((x:any)=>x.callback_url==="https://"+new URL(SUPABASE_URL).host+"/functions/v1/api/strava-webhook")) return;
       throw new Error("La aplicación Strava ya tiene un webhook registrado en otra URL. Elimina la suscripción anterior en Strava antes de conectar.");
     }
   }
   const response=await fetch(base,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({
     client_id:STRAVA_CLIENT_ID,client_secret:STRAVA_CLIENT_SECRET,
-    callback_url:"https://"+new URL(URL).host+"/functions/v1/api/strava-webhook",
+    callback_url:"https://"+new URL(SUPABASE_URL).host+"/functions/v1/api/strava-webhook",
     verify_token:STRAVA_VERIFY_TOKEN
   })});
   if(!response.ok) {
