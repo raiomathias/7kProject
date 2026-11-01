@@ -234,6 +234,24 @@ Deno.serve(async req => {
       if(error) throw error;
       return json({token,user:cleanUser(u)});
     }
+
+    if(path==="public-dashboard" && method==="GET") {
+      const [{data:users,error:e1},{data:runs,error:e2},{data:settings,error:e3},{data:events,error:e4}] = await Promise.all([
+        db.from("users").select("id,display_name,avatar_path").eq("is_active",true).order("display_name"),
+        db.from("runs").select("id,user_id,run_date,distance_km,duration_seconds,pace_seconds_per_km,difficulty,source").order("run_date",{ascending:false}).limit(1000),
+        db.from("goal_settings").select("target_distance_km,deadline,banner_message").eq("id",true).single(),
+        db.from("activity_events").select("id,message,created_at").order("created_at",{ascending:false}).limit(20)
+      ]);
+      if(e1||e2||e3||e4) throw e1??e2??e3??e4;
+      const media:Record<string,string>={};
+      const paths=[...(users??[]).map((u:any)=>u.avatar_path)].filter(Boolean);
+      await Promise.all([...new Set(paths)].map(async(objectPath:string)=>{
+        const {data:signed}=await db.storage.from("7k-media").createSignedUrl(objectPath,3600);
+        if(signed?.signedUrl) media[objectPath]=signed.signedUrl;
+      }));
+      const publicUsers=(users??[]).map((u:any)=>({...u,avatar_url:u.avatar_path?media[u.avatar_path]??null:null}));
+      return json({users:publicUsers,runs:runs??[],settings,events:events??[]});
+    }
     const auth=await session(req);
     if(!auth) return json({error:"Sesión inválida o expirada. Inicia sesión nuevamente."},401);
     const me=auth.user, admin=me.role==="admin";
