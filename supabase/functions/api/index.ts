@@ -71,9 +71,9 @@ async function stravaRequest(token:string,path:string) {
   return data;
 }
 async function saveStravaActivity(userId:string,token:string,summary:any,includeStreams=false) {
-  const kind=String(summary.sport_type||summary.type||"");
+  const detail=includeStreams?await stravaRequest(token,"/activities/"+summary.id):summary;
+  const kind=String(detail.sport_type||detail.type||summary.sport_type||summary.type||"");
   if(!["Run","TrailRun","VirtualRun"].includes(kind)) return null;
-  const detail=await stravaRequest(token,"/activities/"+summary.id);
   const distance=Number(detail.distance||summary.distance)/1000;
   const duration=Math.max(1,Math.round(Number(detail.moving_time||summary.moving_time)));
   if(!Number.isFinite(distance)||distance<=0||distance>100||duration>86400) return null;
@@ -159,8 +159,7 @@ async function processStravaWebhook(payload:any) {
     return;
   }
   const token=await stravaRefresh(connection);
-  const detail=await stravaRequest(token,"/activities/"+activityId);
-  await saveStravaActivity(connection.user_id,token,detail,true);
+  await saveStravaActivity(connection.user_id,token,{id:activityId},true);
   await db.from("strava_connections").update({updated_at:new Date().toISOString()}).eq("user_id",connection.user_id);
 }
 Deno.serve(async req => {
