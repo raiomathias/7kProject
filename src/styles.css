@@ -149,3 +149,7 @@ body{background:#0e1113;color:#f1f3f5}
 .version-badge{display:inline-flex;align-items:center;justify-content:center;min-width:42px;padding:6px 8px;border:1px solid #3b4840;border-radius:7px;background:#1a241d;color:#b6f36b;font-size:10px;font-weight:800;letter-spacing:.5px;line-height:1;white-space:nowrap;}
 .topbar>div{display:flex;align-items:center;gap:10px;}
 @media(max-width:740px){.version-badge{min-width:36px;padding:6px 6px;font-size:9px}.topbar>div{gap:6px}}
+
+
+/* Definitive logo fix: keep the complete 7K wordmark on one line */
+.public-brand>b{display:inline-flex!important;flex:0 0 39px!important;width:39px!important;min-width:39px!important;max-width:39px!important;height:39px!important;align-items:center!important;justify-content:center!important;white-space:nowrap!important;word-break:keep-all!important;overflow:visible!important;font:900 20px/1 Manrope,sans-serif!important;letter-spacing:-1.8px!important;}
