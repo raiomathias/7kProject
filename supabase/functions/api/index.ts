@@ -317,7 +317,7 @@ Deno.serve(async req => {
     if(path==="dashboard" && method==="GET") {
       const [{data:users,error:e1},{data:runs,error:e2},{data:settings,error:e3},{data:events,error:e4}] = await Promise.all([
         db.from("users").select("id,username,display_name,role,avatar_path,bio").eq("is_active",true).order("display_name"),
-        db.from("runs").select("*").order("run_date",{ascending:false}).limit(300),
+        db.from("runs").select("*").order("run_date",{ascending:false}).range(0,1999),
         db.from("goal_settings").select("*").eq("id",true).single(),
         db.from("activity_events").select("id,user_id,event_type,run_id,message,created_at").order("created_at",{ascending:false}).limit(20)
       ]);
