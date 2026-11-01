@@ -6,7 +6,7 @@ const SECRET_KEYS = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}");
 const KEY = SECRET_KEYS.default ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 if (!KEY) throw new Error("Missing Supabase server secret key");
 const db = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-bootstrap-secret", "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS", "Content-Type": "application/json" };
+const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type", "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS", "Content-Type": "application/json" };
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: cors });
 const sha = async (v: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v)))).map(x=>x.toString(16).padStart(2,"0")).join("");
 const random = (n=32) => { const b=crypto.getRandomValues(new Uint8Array(n)); return Array.from(b,x=>x.toString(16).padStart(2,"0")).join(""); };
@@ -33,27 +33,6 @@ Deno.serve(async req => {
   try {
     const url=new URL(req.url), path=url.pathname.split("/").filter(Boolean).pop() ?? "", method=req.method;
     const body=method==="GET"?{}:await req.json().catch(()=>({}));
-    if(path==="bootstrap" && method==="POST") {
-      const provided=req.headers.get("x-bootstrap-secret") ?? "";
-      const expected=Deno.env.get("BOOTSTRAP_SECRET") ?? "";
-      if(expected.length<32 || !same(provided,expected)) return json({error:"Código de configuración inválido."},403);
-      const {count,error:countError}=await db.from("users").select("id",{count:"exact",head:true});
-      if(countError) throw countError;
-      if((count??0)>0) return json({error:"La configuración inicial ya fue completada."},409);
-      const members=[{username:"mathias",display_name:"Mathias",role:"admin"},{username:"lukas",display_name:"Lukas",role:"member"},{username:"vicente",display_name:"Vicente",role:"member"}];
-      if(!Array.isArray(body.accounts)||body.accounts.length!==3) return json({error:"Debes definir las tres contraseñas iniciales."},400);
-      const rows=[];
-      for(const member of members) {
-        const account=body.accounts.find((x:any)=>String(x.username).toLowerCase()===member.username);
-        if(!account || typeof account.password!=="string" || account.password.length<10) return json({error:"Cada contraseña debe tener al menos 10 caracteres."},400);
-        const salt=random(16);
-        rows.push({...member,password_salt:salt,password_hash:await passwordHash(account.password,salt)});
-      }
-      const {error}=await db.from("users").insert(rows);
-      if(error) throw error;
-      const {data:settings}=await db.from("goal_settings").select("*").eq("id",true).single();
-      return json({success:true,message:"Cuentas creadas. Ya pueden iniciar sesión.",settings});
-    }
     if(path==="login" && method==="POST") {
       const username=String(body.username??"").trim().toLowerCase(), password=String(body.password??"");
       if(!username||!password||password.length>256) return json({error:"Usuario o contraseña incorrectos."},401);
