@@ -217,3 +217,16 @@ body{background:#0e1113;color:#f1f3f5}
 .sidebar .brand>b span{display:inline!important;flex:0 0 auto!important;line-height:1!important}
 @media(max-width:850px){.public-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.public-member-grid{grid-template-columns:1fr}.public-history{grid-template-columns:1fr}.public-member-card{padding:15px}.public-data-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.public-home{padding:0 18px}.public-header{height:72px}.public-hero{grid-template-columns:1fr;min-height:auto;padding:48px 0 25px;gap:0}.public-copy h1{font-size:clamp(45px,13vw,65px);letter-spacing:-3px}.public-art{height:230px}.public-km{font-size:150px;letter-spacing:-12px}.public-stats-section{padding-top:15px}.public-section-heading{align-items:flex-start}.public-deadline{padding:9px}.public-stat-grid{gap:8px}.public-stat-grid article{padding:13px}.public-stat-grid b{font-size:23px}.public-goal{padding:15px}.public-section-heading.compact{margin-top:28px}.public-member-km>b{font-size:23px}.public-footer{gap:12px;flex-wrap:wrap}.public-footer span{width:100%}}
+
+
+/* Version 1.1 update prompt */
+.public-header-actions{display:flex;align-items:center;gap:10px}
+.update-notice{display:inline-flex;align-items:center;gap:8px;padding:5px 7px 5px 10px;border:1px solid #607b45;border-radius:8px;background:#202d20;color:#c8eaa5;font-size:10px;font-weight:700;white-space:nowrap}
+.update-notice button{border:0;border-radius:6px;background:#a8d86b;color:#172018;padding:6px 10px;font-size:10px;font-weight:900;cursor:pointer}
+.update-notice button:hover{background:#c1ed8c}
+.public-header-actions .version-badge{margin:0}
+.public-goal>strong{white-space:nowrap}
+.public-member-card>.public-track{margin:3px 0 5px}
+.public-member-card .public-member-details{padding-top:11px}
+@media(max-width:740px){.public-header-actions{gap:5px}.update-notice{font-size:8px;gap:5px;padding:4px}.update-notice button{font-size:8px;padding:5px 7px}}
+@media(max-width:480px){.public-header-actions .update-notice{max-width:145px;white-space:normal;line-height:1.2}.public-header-actions .version-badge{display:none}}
