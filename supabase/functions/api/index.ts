@@ -112,8 +112,13 @@ async function syncStravaUser(userId:string) {
   if(error||!connection) throw new Error("No hay una cuenta Strava conectada.");
   try {
     const token=await stravaRefresh(connection);
-    const activities=await stravaRequest(token,"/athlete/activities?per_page=100&page=1");
-    const running=(activities||[]).filter((a:any)=>["Run","TrailRun","VirtualRun"].includes(String(a.sport_type||a.type)));
+    const activities:any[]=[];
+    for(let page=1;page<=20;page++) {
+      const batch=await stravaRequest(token,"/athlete/activities?per_page=100&page="+page);
+      activities.push(...(batch||[]));
+      if(!batch||batch.length<100) break;
+    }
+    const running=activities.filter((a:any)=>["Run","TrailRun","VirtualRun"].includes(String(a.sport_type||a.type)));
     let imported=0,details=0;
     for(const activity of running) {
       await saveStravaActivity(userId,token,activity,details<12);
