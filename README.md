@@ -45,5 +45,6 @@ Las imágenes se convierten en el navegador a WebP, se redimensionan a 1920 px p
 - El token de sesión se guarda en `sessionStorage`, nunca el objeto usuario ni el rol.
 - El servidor valida la sesión en cada petición y comprueba rol admin en las operaciones administrativas.
 - Los hashes de sesión se almacenan en la base de datos; se pueden revocar al cerrar sesión o desactivar un usuario.
+- Los intentos fallidos de inicio de sesión tienen límite por usuario y origen (8 intentos en 15 minutos).
 - No se concede acceso directo a tablas ni bucket a los roles públicos.
 - `BOOTSTRAP_SECRET` solo debe existir en los secretos de Edge Functions.
