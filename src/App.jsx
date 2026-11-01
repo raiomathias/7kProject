@@ -5,7 +5,7 @@ import {api,supabase} from "./lib/supabase";
 import {compressImage} from "./lib/images";
 const date=d=>new Intl.DateTimeFormat("es-CL",{day:"2-digit",month:"short",year:"numeric"}).format(new Date(d));
 const time=s=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60),v=s%60;return h?`${h}:${String(m).padStart(2,"0")}:${String(v).padStart(2,"0")}`:`${m}:${String(v).padStart(2,"0")}`};
-const APP_VERSION="1.4";
+const APP_VERSION="1.5";
 const pace=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 const durationDigits=value=>String(value??"").replace(/[^0-9]/g,"").slice(0,4);
 const durationSeconds=value=>{const raw=String(value??"").trim();if(raw.includes(":")){const p=raw.split(":").map(Number);if(p.length===2)return (p[0]||0)*60+(p[1]||0);if(p.length===3)return (p[0]||0)*3600+(p[1]||0)*60+(p[2]||0)}const d=durationDigits(raw).padStart(4,"0");return Number(d.slice(0,2))*60+Number(d.slice(2))};
