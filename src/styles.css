@@ -141,3 +141,11 @@ body{background:#0e1113;color:#f1f3f5}
 /* Keep the 7K mark on one horizontal line */
 .public-brand>b{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:0;white-space:nowrap;line-height:1;letter-spacing:-2px;overflow:visible}
 .public-brand>b span{display:inline;flex:0 0 auto;line-height:1;vertical-align:baseline}
+
+
+/* v1.0: stable compact version indicator and horizontal brand mark */
+.public-brand>b{display:inline-flex!important;flex-flow:row nowrap!important;align-items:center!important;justify-content:center!important;gap:0!important;white-space:nowrap!important;min-width:39px!important;}
+.public-brand>b i{display:inline-block!important;flex:0 0 auto!important;font-style:normal!important;line-height:1!important;}
+.version-badge{display:inline-flex;align-items:center;justify-content:center;min-width:42px;padding:6px 8px;border:1px solid #3b4840;border-radius:7px;background:#1a241d;color:#b6f36b;font-size:10px;font-weight:800;letter-spacing:.5px;line-height:1;white-space:nowrap;}
+.topbar>div{display:flex;align-items:center;gap:10px;}
+@media(max-width:740px){.version-badge{min-width:36px;padding:6px 6px;font-size:9px}.topbar>div{gap:6px}}
