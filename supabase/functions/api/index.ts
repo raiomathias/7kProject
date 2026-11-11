@@ -367,15 +367,20 @@ Deno.serve(async req => {
     if(path==="admin-users" && method==="PATCH") {
       if(!admin) return json({error:"Acceso exclusivo de administración."},403);
       const id=String(body.id??""), password=String(body.password??"");
-      const updates:any={display_name:String(body.display_name??"").slice(0,80),bio:String(body.bio??"").slice(0,280),avatar_path:body.avatar_path||null};
+      if(!id) return json({error:"Integrante no válido."},400);
+      const updates:any={};
+      if(body.display_name!==undefined) updates.display_name=String(body.display_name).slice(0,80);
+      if(body.bio!==undefined) updates.bio=String(body.bio).slice(0,280);
+      if(body.avatar_path!==undefined) updates.avatar_path=body.avatar_path||null;
       if(password) {
-        if(password.length<10) return json({error:"La contraseña debe tener al menos 10 caracteres."},400);
+        if(password.length<10||password.length>256) return json({error:"La contraseña debe tener entre 10 y 256 caracteres."},400);
         const salt=random(16); updates.password_salt=salt; updates.password_hash=await passwordHash(password,salt);
       }
       if(body.is_active!==undefined) updates.is_active=Boolean(body.is_active);
+      if(!Object.keys(updates).length) return json({error:"No hay cambios para guardar."},400);
       const {data,error}=await db.from("users").update(updates).eq("id",id).select("id,username,display_name,role,avatar_path,bio,is_active").single();
       if(error) throw error;
-      if(body.is_active===false) await db.from("sessions").update({revoked_at:new Date().toISOString()}).eq("user_id",id).is("revoked_at",null);
+      if(body.is_active===false || (password && id!==me.id)) await db.from("sessions").update({revoked_at:new Date().toISOString()}).eq("user_id",id).is("revoked_at",null);
       return json({user:data});
     }
     if(path==="media" && method==="POST") {
